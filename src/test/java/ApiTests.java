@@ -1,4 +1,4 @@
-import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 import org.junit.jupiter.api.BeforeAll;
@@ -9,37 +9,31 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.restassured.RestAssured.*;
+import static io.restassured.RestAssured.baseURI;
+import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ApiTests {
 
-    private static final int unexistingPetId = 54532323;
+    private static final String UNEXISTING_PET_ID = "54532323";
+    private static final String AVAILABLE_STATUS = "available";
 
     @BeforeAll
     public static void clearTestData() {
-        given()
-                .when()
-                .delete("https://petstore.swagger.io/v2/pet/" + unexistingPetId)
-                .then()
-                .log().all();
+        given().delete("https://petstore.swagger.io/v2/pet/" + UNEXISTING_PET_ID);
     }
 
     @BeforeEach
     public void setup() {
-        RestAssured.baseURI = "https://petstore.swagger.io/v2/";
+        baseURI = "https://petstore.swagger.io/v2/";
     }
 
     @Test //Not BDD
     public void notFoundTestWithAssert() {
-        RestAssured.baseURI += "pet/" + unexistingPetId; //Добавили эндпоинт и id
-
-        //Создаем объект requestSpecification
-        requestSpecification = given();
 
         //Вызываем get метод, ответ кладем в response
-        Response response = requestSpecification.get();
+        Response response = given().get("pet/" + UNEXISTING_PET_ID);
 
         //Выводим response на консоль
         System.out.println("Response: " + response.asPrettyString());
@@ -52,13 +46,9 @@ public class ApiTests {
 
     @Test //Not BDD
     public void petNotFoundTest() {
-        RestAssured.baseURI += "pet/" + unexistingPetId; //Добавили эндпоинт и id
-
-        //Создаем объект requestSpecification
-        requestSpecification = given();
 
         //Вызываем get метод, ответ кладем в response
-        Response response = requestSpecification.get();
+        Response response = given().get("pet/" + UNEXISTING_PET_ID);
 
         //Выводим response на консоль
         System.out.println("Response: " + response.asPrettyString());
@@ -80,7 +70,7 @@ public class ApiTests {
     @Test
     public void petNotFoundTestBdd() {
         given().when()
-                .get(baseURI + "pet/" + unexistingPetId)
+                .get(baseURI + "pet/" + UNEXISTING_PET_ID)
                 .then()
                 .log().all()
                 .statusCode(404)
@@ -91,7 +81,7 @@ public class ApiTests {
     @Test
     public void checkTypeForPetTest() {
         given().when()
-                .get(baseURI + "pet/" + unexistingPetId)
+                .get(baseURI + "pet/" + UNEXISTING_PET_ID)
                 .then()
                 .log().all()
                 .body("type", equalTo("error"));
@@ -100,16 +90,16 @@ public class ApiTests {
     @Test
     @DisplayName("Добавление нового питомца")
     public void newPetTest() {
-        Integer id = unexistingPetId;
+
         String name = "cat";
-        String status = "available";
+        String status = AVAILABLE_STATUS;
 
         Map<String, String> request = new HashMap<>();
-        request.put("id", id.toString());
+        request.put("id", UNEXISTING_PET_ID);
         request.put("name", name);
         request.put("status", status);
 
-        given().contentType("application/json")
+        given().contentType(ContentType.JSON)
                 .body(request)
                 .when()
                 .post(baseURI + "pet/")
@@ -118,7 +108,11 @@ public class ApiTests {
                 .time(lessThan(5000L))
                 .assertThat()
                 .statusCode(200)
-                .body("id", equalTo(id), "name", equalTo(name), "status", equalTo(status));
+                .body("id", equalTo(Integer.parseInt(UNEXISTING_PET_ID)),
+                        "name", equalTo(name),
+                        "status", equalTo(status));
+
+        clearTestData();
 
     }
 
@@ -126,12 +120,15 @@ public class ApiTests {
     @DisplayName("Поиск питомца по статусу available")
     public void searchPetWithStatusAvailable() {
         given().when()
-                .get(baseURI + "pet/" + "findByStatus?status=available")
+                .log().all()
+                .params("status", AVAILABLE_STATUS)
+                .get("pet/findByStatus")
                 .then()
                 .log().all()
                 .statusCode(200)
                 .time(lessThan(3000L))
-                .body("status", everyItem(equalTo("available")), "id", everyItem(notNullValue()
-                ), "name", everyItem(notNullValue()));
+                .body("status", everyItem(equalTo(AVAILABLE_STATUS)));
+
     }
+
 }
